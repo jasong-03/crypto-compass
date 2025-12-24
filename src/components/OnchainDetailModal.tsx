@@ -1,9 +1,11 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SentimentBadge } from './SentimentBadge';
+import { MiniBarChart } from './MiniBarChart';
 import { TokenData, SentimentType, OnchainToken } from '@/types/crypto';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useOnchainData } from '@/hooks/useOnchainData';
+import { useOnchainPriceHistory } from '@/hooks/useOnchainPriceHistory';
 import { calculateOnchainSentiment } from '@/lib/sentiment';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -15,7 +17,9 @@ interface OnchainDetailModalProps {
 
 interface IndicatorRow {
   name: string;
+  historyKey: string;
   currentValue: number | null;
+  changeValue: number | null;
 }
 
 function formatIndicatorName(key: string): string {
@@ -56,10 +60,13 @@ function getIndicatorRows(onchainData: OnchainToken): IndicatorRow[] {
       const baseKey = key.replace(/_chg_7h$/i, '').replace(/_chg7h$/i, '');
       const currentValueKey = baseKey;
       const currentValue = onchainData[currentValueKey] as number | null | undefined;
-      
+      const changeValue = onchainData[key] as number | null | undefined;
+
       rows.push({
         name: formatIndicatorName(key),
+        historyKey: baseKey, // Key to lookup in price history
         currentValue: (typeof currentValue === 'number' && !isNaN(currentValue)) ? currentValue : null,
+        changeValue: (typeof changeValue === 'number' && !isNaN(changeValue)) ? changeValue : null,
       });
     }
   }
@@ -73,8 +80,13 @@ export function OnchainDetailModal({ token, open, onOpenChange }: OnchainDetailM
     token?.parentProtocol || null
   );
 
+  // Fetch price history for the last 6h chart
+  const { data: priceHistory, isLoading: isHistoryLoading } = useOnchainPriceHistory(
+    token?.parentProtocol || null
+  );
+
   // Calculate sentiment from fetched data
-  const onchainSentiment = onchainData 
+  const onchainSentiment = onchainData
     ? calculateOnchainSentiment(onchainData)
     : 'neutral';
 
@@ -118,12 +130,14 @@ export function OnchainDetailModal({ token, open, onOpenChange }: OnchainDetailM
           </div>
         </DialogHeader>
 
-        <div className="mt-4 rounded-lg border border-border/50 overflow-hidden">
+        <div className="mt-4 rounded-lg border border-border/50 overflow-hidden max-h-[60vh] overflow-y-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-card z-10">
               <TableRow className="border-border/50 hover:bg-transparent">
-                <TableHead className="text-muted-foreground font-semibold">Indicator</TableHead>
-                <TableHead className="text-muted-foreground font-semibold">Current Value</TableHead>
+                <TableHead className="text-muted-foreground font-semibold bg-card">Indicator</TableHead>
+                <TableHead className="text-muted-foreground font-semibold bg-card">Current Value</TableHead>
+                <TableHead className="text-muted-foreground font-semibold bg-card">7h Change</TableHead>
+                <TableHead className="text-muted-foreground font-semibold bg-card">Last 6h</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -136,17 +150,23 @@ export function OnchainDetailModal({ token, open, onOpenChange }: OnchainDetailM
                     <TableCell>
                       <Skeleton className="h-4 w-24" />
                     </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-20" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-16" />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : isError ? (
                 <TableRow>
-                  <TableCell colSpan={2} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                     Failed to load onchain data
                   </TableCell>
                 </TableRow>
               ) : indicatorRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={2} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                     No onchain indicators available
                   </TableCell>
                 </TableRow>
@@ -158,6 +178,23 @@ export function OnchainDetailModal({ token, open, onOpenChange }: OnchainDetailM
                     </TableCell>
                     <TableCell className="font-mono text-foreground">
                       {formatCurrency(row.currentValue)}
+                    </TableCell>
+                    <TableCell className={`font-mono ${
+                      row.changeValue === null ? 'text-muted-foreground' :
+                      row.changeValue < 0 ? 'text-bullish' :
+                      row.changeValue > 0 ? 'text-bearish' :
+                      'text-muted-foreground'
+                    }`}>
+                      {row.changeValue === null ? 'N/A' : formatPercentage(row.changeValue)}
+                    </TableCell>
+                    <TableCell>
+                      {isHistoryLoading ? (
+                        <Skeleton className="h-6 w-16" />
+                      ) : (
+                        <MiniBarChart
+                          values={priceHistory?.[row.historyKey] || []}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

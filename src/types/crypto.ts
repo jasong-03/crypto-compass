@@ -4,7 +4,10 @@ export interface FundamentalToken {
   parentProtocol: string;
   symbol: string;
   logo: string;
+  rank: string;
   rank_description: string;
+  score?: number;
+  category_id?: number;
   [key: string]: unknown;
 }
 

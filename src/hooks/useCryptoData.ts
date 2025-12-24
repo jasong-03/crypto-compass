@@ -12,7 +12,7 @@ const FUNDAMENTAL_API = 'https://mvp-testidea-1094890588015.asia-southeast1.run.
 const ONCHAIN_API = 'https://mvp-testidea-1094890588015.asia-southeast1.run.app/netflow_intelligence';
 
 // Pagination settings
-const LIMIT = 20;
+const LIMIT = 200; // Fetch all fundamental data to ensure complete matching
 
 // Flag to use mock data (set to false to try real APIs)
 const USE_MOCK_DATA = false;
@@ -104,14 +104,28 @@ export function useCryptoData(page: number = 1) {
     total: onchainTotal || fundamentalQuery.data?.total || 0,
   };
 
-  // Build fundamental map for quick lookup
+  // Rank priority: A+ > A > B+ > B > C+ > C > D (higher is better)
+  const rankPriority: Record<string, number> = {
+    'A+': 7, 'A': 6, 'B+': 5, 'B': 4, 'C+': 3, 'C': 2, 'D': 1
+  };
+
+  // Build fundamental map for quick lookup - keep best rank for duplicates
   const fundamentalMap = new Map<string, FundamentalToken>();
   if (fundamentalQuery.data?.data && Array.isArray(fundamentalQuery.data.data)) {
     for (const fundToken of fundamentalQuery.data.data) {
       if (fundToken.parentProtocol) {
         const key = fundToken.parentProtocol.toLowerCase();
-        if (!fundamentalMap.has(key)) {
+        const existing = fundamentalMap.get(key);
+
+        if (!existing) {
           fundamentalMap.set(key, fundToken);
+        } else {
+          // Keep the one with better rank
+          const existingPriority = rankPriority[existing.rank] || 0;
+          const newPriority = rankPriority[fundToken.rank] || 0;
+          if (newPriority > existingPriority) {
+            fundamentalMap.set(key, fundToken);
+          }
         }
       }
     }
