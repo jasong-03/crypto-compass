@@ -181,8 +181,8 @@ export function OnchainDetailModal({ token, open, onOpenChange }: OnchainDetailM
                     </TableCell>
                     <TableCell className={`font-mono ${
                       row.changeValue === null ? 'text-muted-foreground' :
-                      row.changeValue < 0 ? 'text-bullish' :
-                      row.changeValue > 0 ? 'text-bearish' :
+                      row.changeValue < 0 ? 'text-bearish' :
+                      row.changeValue > 0 ? 'text-bullish' :
                       'text-muted-foreground'
                     }`}>
                       {row.changeValue === null ? 'N/A' : formatPercentage(row.changeValue)}
